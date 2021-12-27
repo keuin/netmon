@@ -12,7 +12,7 @@
 const char *logfile = "netmon.log";
 int check_interval_seconds = 30; // seconds to sleep between checks
 int max_check_failure = 5; // how many failures to reboot the system
-int be_daemonize = 0; // should run as a daemon process
+int as_daemon = 0; // should run as a daemon process
 
 volatile int require_reboot = 0;
 void *logger = NULL;
@@ -210,7 +210,7 @@ int main(int argc, char *argv[]) {
             logfile = argv[i + 1];
             ++i; // skip next value
         } else if (!strcmp(argv[i], "-d")) {
-            be_daemonize = 1;
+            as_daemon = 1;
         } else {
             int invalid = strcmp(argv[i], "-h") != 0 && strcmp(argv[i], "--help") != 0;
             if (invalid) printf("Unrecognized parameter \"%s\".\n", argv[i]);
@@ -222,7 +222,7 @@ int main(int argc, char *argv[]) {
 
     logger = log_init(logfile);
     log_debug(logger, "DEBUG logging is enabled.");
-    if (be_daemonize) {
+    if (as_daemon) {
         log_info(logger, "Daemonizing...");
         daemonize();
     }
