@@ -28,7 +28,7 @@ void daemonize() {
     }
     if (pid > 0) {
         char buf[32];
-        sprintf(buf, "Child process: %d", pid);
+        snprintf(buf, 31, "Child process: %d", pid);
         log_info(logger, buf);
         exit(0); // exit parent process
     }
@@ -180,8 +180,10 @@ void loop() {
     while (1) {
         log_info(logger, "Check network.");
         if (check_network() != 0) {
-            log_info(logger, "Network failure detected.");
             ++failures;
+            char buf[64];
+            snprintf(buf, 63, "Network failure detected. counter=%d", failures);
+            log_info(logger, buf);
         } else {
             log_info(logger, "Network is OK.");
             failures = 0;
