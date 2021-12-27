@@ -6,3 +6,8 @@ Usage:
   -n <max_failure>     specify how many continous network failures we get until we reboot the system
   -l <log_file>        specify the log file
   -d                   run as a daemon process
+
+
+Debugging:
+
+  Declare macro `DEBUG` to enable debug level logging. This is enabled in CMake task by default.
