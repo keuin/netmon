@@ -230,7 +230,7 @@ int main(int argc, char *argv[]) {
     loop();
     log_info(logger, "netmon is stopped.");
     if (require_reboot) {
-        log_init("Trigger system reboot.");
+        log_info(logger, "Trigger system reboot.");
         system("reboot");
     }
     log_free(logger);
