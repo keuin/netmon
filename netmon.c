@@ -29,7 +29,7 @@ void daemonize() {
     if (pid > 0) {
         char buf[32];
         sprintf(buf, "Child process: %d", pid);
-        log_init(buf);
+        log_info(logger, buf);
         exit(0); // exit parent process
     }
     // unmask the file mode
