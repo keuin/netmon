@@ -6,6 +6,8 @@
 #define NETMON_NETCHECK_H
 
 
-int check_network(void *logger);
+int check_tcp(void *logger);
+
+int check_ping(void *logger, const char *dest, const char *ping);
 
 #endif //NETMON_NETCHECK_H

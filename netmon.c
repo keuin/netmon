@@ -8,11 +8,15 @@
 
 
 const char *logfile = "netmon.log";
-int check_interval_seconds = 30; // seconds to sleep between checks
+const char *pingdest = NULL; // which host to ping. If NULL, test tcp instead
+const char *failcmd = "reboot"; // cmd to be executed. If NULL, reboot // TODO support blanks
+unsigned int check_interval_seconds = 30; // seconds to sleep between checks
 int max_check_failure = 5; // how many failures to reboot the system
 int as_daemon = 0; // should run as a daemon process
+unsigned int failure_sleep_seconds = 60; // seconds to sleep before resuming check after a network failure is detected
+// TODO make failure_sleep_seconds configurable
 
-volatile int require_reboot = 0;
+volatile int failure_detected = 0;
 void *logger = NULL;
 
 void daemonize() {
@@ -94,7 +98,9 @@ void loop() {
 #pragma ide diagnostic ignored "EndlessLoop"
     while (1) {
         log_info(logger, "Check network.");
-        if (check_network(logger) != 0) {
+        if ((pingdest == NULL) ?
+            (check_tcp(logger) != 0) :
+            (check_ping(logger, pingdest, NULL) != 0)) {
             ++failures;
             char buf[64];
             snprintf(buf, 63, "Network failure detected. counter=%d", failures);
@@ -105,8 +111,21 @@ void loop() {
         }
         if (failures > max_check_failure) {
             log_info(logger, "Max failure times exceeded.");
-            require_reboot = 1;
-            return;
+            failure_detected = 1;
+            failures = 0; // reset failure counter
+
+            // handle a network failure event
+            char tmp[256];
+            snprintf(tmp, 255, "Run system command `%s`.", failcmd);
+            log_info(logger, tmp);
+            system(failcmd);
+
+            snprintf(tmp, 255, "Wait %d secs before resume checking.\n", failure_sleep_seconds);
+            log_debug(logger, tmp);
+            unsigned t = failure_sleep_seconds;
+            while ((t = sleep(t)));
+
+            continue; // resume checking right now
         }
         log_info(logger, "Sleeping...");
         unsigned int t = check_interval_seconds;
@@ -119,12 +138,33 @@ int main(int argc, char *argv[]) {
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "-t")) {
             check_interval_seconds = atoi(argv[i + 1]);
+            if (check_interval_seconds <= 0) {
+                fprintf(stderr, "check interval should be positive.\n");
+                return -1;
+            }
             ++i; // skip next value
         } else if (!strcmp(argv[i], "-n")) {
             max_check_failure = atoi(argv[i + 1]);
+            if (max_check_failure < 0) {
+                fprintf(stderr, "max check failure should not be negative.\n");
+                return -1;
+            }
             ++i; // skip next value
         } else if (!strcmp(argv[i], "-l")) {
             logfile = argv[i + 1];
+            ++i; // skip next value
+        } else if (!strcmp(argv[i], "-p")) {
+            pingdest = argv[i + 1];
+            ++i; // skip next value
+        } else if (!strcmp(argv[i], "-c")) {
+            char *s = argv[i + 1];
+            unsigned long len = strlen(s);
+            if (len == 0) {
+                fprintf(stderr, "Empty fail command.\n");
+                return -1;
+            }
+            failcmd = s;
+            fprintf(stderr, "Fail command is set to `%s`.\n", failcmd);
             ++i; // skip next value
         } else if (!strcmp(argv[i], "-d")) {
             as_daemon = 1;
@@ -132,7 +172,8 @@ int main(int argc, char *argv[]) {
             int invalid = strcmp(argv[i], "-h") != 0 && strcmp(argv[i], "--help") != 0;
             if (invalid) printf("Unrecognized parameter \"%s\".\n", argv[i]);
             printf("Usage:\n"
-                   "  %s [-t <check_interval>] [-n <max_failure>] [-l <log_file>] [-d]\n", argv[0]);
+                   "  %s [-t <check_interval>] [-n <max_failure>] [-l <log_file>] [-c <cmd>] [-p <ping_host>] [-d]\n",
+                   argv[0]);
             return invalid != 0;
         }
     }
@@ -146,10 +187,6 @@ int main(int argc, char *argv[]) {
     log_info(logger, "netmon is started.");
     loop();
     log_info(logger, "netmon is stopped.");
-    if (require_reboot) {
-        log_info(logger, "Trigger system reboot.");
-        system("reboot");
-    }
     log_free(logger);
     return 0;
 }

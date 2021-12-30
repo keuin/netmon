@@ -5,18 +5,20 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include "logging.h"
 #include "netcheck.h"
+#include "validate.h"
 
 /**
- * Check network availability.
+ * Check network availability by testing a tcp communication.
  * @return Zero if success, non-zero if failed.
  */
-int check_network(void *logger) {
+int check_tcp(void *logger) {
 #define RETURN(r) do { rv = (r); goto RET; } while(0)
 #define READ_SIZE 32
 
@@ -93,4 +95,62 @@ int check_network(void *logger) {
     return rv;
 #undef RETURN
 #undef READ_SIZE
+}
+
+/**
+ * Check network availability by pinging a remote host.
+ * Note that this routine requires an external ping program.
+ * @return Zero if success, non-zero if failed.
+ * @param logger the logger.
+ * @param dest the destination host, whether a domain or an ip address.
+ * @param ping path to the ping executable. If null, will use `/bin/ping`.
+ * @return Zero if success, non-zero if failed.
+ */
+int check_ping(void *logger, const char *dest, const char *ping) {
+    if (!is_valid_ipv4(dest)) {
+        log_error(logger, "dest is not a valid IPv4 address.");
+        return -1;
+    }
+
+#define BUFLEN 1024
+#define RETURN(r) do { rv = (r); goto CP_RET; } while(0)
+    int rv = 0;
+    // Copied from https://stackoverflow.com/questions/8189935/is-there-any-way-to-ping-a-specific-ip-address-with-c
+    if (ping == NULL) ping = "/bin/ping";
+    int pipe_arr[2] = {-1};
+    char buf[BUFLEN] = {0};
+
+    // Create pipe - pipe_arr[0] is "reading end", pipe_arr[1] is "writing end"
+    if (pipe(pipe_arr)) {
+        perror("pipe()");
+        log_error(logger, "pipe() failed.");
+        return -1;
+    }
+
+    if (fork() == 0) {
+        // child
+        if (dup2(pipe_arr[1], STDOUT_FILENO) < 0) {
+            log_error(logger, "dup2() failed.");
+            exit(-1);
+        }
+        execl(ping, "ping", "-c 3", dest, (char *) NULL);
+    } else {
+        // parent
+        if (wait(NULL) < 0) {
+            perror("wait()");
+            log_error(logger, "wait() failed.");
+            RETURN(-1);
+        }
+        if (read(pipe_arr[0], buf, BUFLEN) < 0) {
+            perror("read()");
+            log_error(logger, "read() failed.");
+            RETURN(-1);
+        }
+    }
+    CP_RET:
+    if (pipe_arr[0] >= 0) close(pipe_arr[0]);
+    if (pipe_arr[1] >= 0) close(pipe_arr[1]);
+    return (rv) ? (rv) : (strstr(buf, "time=") == NULL);
+#undef BUFLEN
+#undef RETURN
 }

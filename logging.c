@@ -3,6 +3,7 @@
 //
 
 #include "logging.h"
+#include "validate.h"
 #include <stdio.h>
 
 
@@ -17,6 +18,10 @@ void log_free(void *logger) {
 }
 
 void log_print(void *logger, const char *level, time_t ts, const char *filename, int lineno, const char *msg) {
+    NOTNULL(logger);
+    NOTNULL(level);
+    NOTNULL(filename);
+    NOTNULL(msg);
     char timestr[32];
     strftime(timestr, 31, "%Y-%m-%d %H:%M:%S", localtime(&ts));
     if (fprintf(logger, "[%s][%s][%s][%d] %s\n", timestr, level, filename, lineno, msg))
