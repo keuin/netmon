@@ -43,7 +43,11 @@ void daemonize() {
         log_error(logger, "setsid() failed.");
         exit(1);
     }
-    chdir("/");
+    if (chdir("/")) {
+        perror("chdir()");
+        log_error(logger, "chdir() failed,");
+        exit(1);
+    }
     close(STDIN_FILENO);
     close(STDOUT_FILENO);
     close(STDERR_FILENO);
