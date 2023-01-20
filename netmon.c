@@ -12,15 +12,29 @@
 #include "optparse.h"
 
 const char *logfile = "netmon.log";
-const char *pingdest = NULL; // which host to ping. If NULL, test tcp instead
-const char *failcmd = "reboot"; // cmd to be executed. If NULL, reboot // TODO support blanks
-unsigned int check_interval_seconds = 30; // seconds to sleep between checks
-int max_check_failure = 5; // how many failures to reboot the system
-int as_daemon = 0; // should run as a daemon process
-unsigned int failure_sleep_seconds = 60; // seconds to sleep before resuming check after a network failure is detected
+
+// which host to ping. If NULL, test tcp instead
+const char *pingdest = NULL;
+
+// TODO support blanks
+// cmd to be executed. If NULL, reboot
+const char *failcmd = "reboot";
+
+// seconds to sleep between checks
+unsigned int check_interval_seconds = 30;
+
+// how many failures to reboot the system
+int max_check_failure = 5;
+
+// should run as a daemon process
+int as_daemon = 0;
+
 // TODO make failure_sleep_seconds configurable
+// seconds to sleep before resuming check after a network failure is detected
+unsigned int failure_sleep_seconds = 60;
 
 volatile int failure_detected = 0;
+
 void *logger = NULL;
 
 void daemonize() {
@@ -128,7 +142,8 @@ void loop() {
             log_info(logger, tmp);
             system(failcmd);
 
-            snprintf(tmp, 255, "Wait %d secs before resume checking.\n", failure_sleep_seconds);
+            snprintf(tmp, 255, "Wait %d secs before resume checking.\n",
+                     failure_sleep_seconds);
             log_debug(logger, tmp);
             unsigned t = failure_sleep_seconds;
             while ((t = sleep(t)));
