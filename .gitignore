@@ -1,0 +1,8 @@
+.vscode
+.code
+.idea
+
+.cache
+
+build
+cmake-build*
