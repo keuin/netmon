@@ -6,6 +6,10 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#define OPTPARSE_IMPLEMENTATION
+#define OPTPARSE_API static
+
+#include "optparse.h"
 
 const char *logfile = "netmon.log";
 const char *pingdest = NULL; // which host to ping. If NULL, test tcp instead
@@ -139,46 +143,67 @@ void loop() {
 }
 
 int main(int argc, char *argv[]) {
-    for (int i = 1; i < argc; ++i) {
-        if (!strcmp(argv[i], "-t")) {
-            check_interval_seconds = atoi(argv[i + 1]);
-            if (check_interval_seconds <= 0) {
-                fprintf(stderr, "check interval should be positive.\n");
-                return -1;
-            }
-            ++i; // skip next value
-        } else if (!strcmp(argv[i], "-n")) {
-            max_check_failure = atoi(argv[i + 1]);
-            if (max_check_failure < 0) {
-                fprintf(stderr, "max check failure should not be negative.\n");
-                return -1;
-            }
-            ++i; // skip next value
-        } else if (!strcmp(argv[i], "-l")) {
-            logfile = argv[i + 1];
-            ++i; // skip next value
-        } else if (!strcmp(argv[i], "-p")) {
-            pingdest = argv[i + 1];
-            ++i; // skip next value
-        } else if (!strcmp(argv[i], "-c")) {
-            char *s = argv[i + 1];
-            unsigned long len = strlen(s);
-            if (len == 0) {
-                fprintf(stderr, "Empty fail command.\n");
-                return -1;
-            }
-            failcmd = s;
-            fprintf(stderr, "Fail command is set to `%s`.\n", failcmd);
-            ++i; // skip next value
-        } else if (!strcmp(argv[i], "-d")) {
-            as_daemon = 1;
-        } else {
-            int invalid = strcmp(argv[i], "-h") != 0 && strcmp(argv[i], "--help") != 0;
-            if (invalid) printf("Unrecognized parameter \"%s\".\n", argv[i]);
-            printf("Usage:\n"
-                   "  %s [-t <check_interval>] [-n <max_failure>] [-l <log_file>] [-c <cmd>] [-p <ping_host>] [-d]\n",
-                   argv[0]);
-            return invalid != 0;
+    struct optparse_long opts[] = {
+            {"interval",    't', OPTPARSE_REQUIRED},
+            {"max-failure", 'n', OPTPARSE_REQUIRED},
+            {"log",         'l', OPTPARSE_REQUIRED},
+            {"ping",        'p', OPTPARSE_REQUIRED},
+            {"command",     'c', OPTPARSE_REQUIRED},
+            {"daemon",      'd', OPTPARSE_NONE},
+            {"help",        'h', OPTPARSE_NONE},
+            {0}
+    };
+    int option;
+    struct optparse options;
+
+    char *end;
+
+    optparse_init(&options, argv);
+    while ((option = optparse_long(&options, opts, NULL)) != -1) {
+        switch (option) {
+            case 't':
+                check_interval_seconds = (int) strtol(options.optarg, &end, 10);
+                if (*end != '\0') {
+                    die("Invalid check interval: %s\n", options.optarg);
+                }
+                if (check_interval_seconds <= 0) {
+                    die("Check interval should be positive.\n");
+                }
+                break;
+            case 'n':
+                max_check_failure = (int) strtol(options.optarg, &end, 10);
+                if (*end != '\0') {
+                    die("Invalid max check failure times: %s\n",
+                        options.optarg);
+                }
+                if (max_check_failure < 0) {
+                    die("Max check failure times should not be negative.\n");
+                }
+                break;
+            case 'l':
+                logfile = strdup(options.optarg);
+                break;
+            case 'p':
+                pingdest = strdup(options.optarg);
+                break;
+            case 'c':
+                failcmd = strdup(options.optarg);
+                break;
+            case 'd':
+                as_daemon = 1;
+                break;
+            case 'h':
+                printf("Usage: %s "
+                       "[-t <check_interval>] "
+                       "[-n <max_failure>] "
+                       "[-l <log_file>] "
+                       "[-c <cmd>] "
+                       "[-p <ping_host>] "
+                       "[-d]\n",
+                       argv[0]);
+                exit(0);
+            default:
+                die("%s: %s\n", argv[0], options.errmsg);
         }
     }
 

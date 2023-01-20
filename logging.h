@@ -7,11 +7,18 @@
 
 #include <time.h>
 
+#define die(args...) \
+    do { \
+        fprintf(stderr, args); \
+        exit(1); \
+    } while(0)
+
 void *log_init(const char *filename);
 
 void log_free(void *logger);
 
-void log_print(void *logger, const char *level, time_t ts, const char *filename, int lineno, const char *msg);
+void log_print(void *logger, const char *level, time_t ts, const char *filename,
+               int lineno, const char *msg);
 
 #ifdef DEBUG
 #define log_debug(logger, msg) log_print((logger), "DEBUG", time(NULL), __FILE__, __LINE__, (msg))
